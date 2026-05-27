@@ -595,11 +595,24 @@ def test_run_codex_stream_parses_create_stream_events(monkeypatch):
     """The primary path consumes ``responses.create(stream=True)`` events directly."""
     agent = _build_agent(monkeypatch)
     calls = {"create": 0}
+    output_item = SimpleNamespace(
+        type="message",
+        status="completed",
+        content=[SimpleNamespace(type="output_text", text="streamed create ok")],
+    )
     create_stream = _FakeCreateStream(
         [
             SimpleNamespace(type="response.created"),
-            SimpleNamespace(type="response.in_progress"),
-            SimpleNamespace(type="response.completed", response=_codex_message_response("streamed create ok")),
+            SimpleNamespace(type="response.output_item.done", item=output_item),
+            SimpleNamespace(
+                type="response.completed",
+                response=SimpleNamespace(
+                    id="resp_streamed_create",
+                    status="completed",
+                    output=[output_item],
+                    usage=SimpleNamespace(input_tokens=7, output_tokens=4, total_tokens=11),
+                ),
+            ),
         ]
     )
 
@@ -615,15 +628,10 @@ def test_run_codex_stream_parses_create_stream_events(monkeypatch):
     response = agent._run_codex_stream(_codex_request_kwargs())
     assert calls["create"] == 1
     assert create_stream.closed is True
-    # The wire's response.completed.response.output is a list with the message item,
-    # but the event-driven path reconstructs from response.output_item.done.
-    # _codex_message_response returns a SimpleNamespace whose .output is a list of
-    # items — we don't read those directly, we read the items via output_item.done,
-    # but this fixture doesn't emit output_item.done. So the consumer assembles a
-    # message from streamed text deltas if present, or returns the items it has.
-    # For backward compatibility with the helper that builds _codex_message_response,
-    # we just assert status is completed and id propagated.
     assert response.status == "completed"
+    assert response.id == "resp_streamed_create"
+    assert response.output == [output_item]
+    assert response.usage.total_tokens == 11
 
 
 def test_run_codex_stream_ignores_completed_response_with_null_output(monkeypatch):
