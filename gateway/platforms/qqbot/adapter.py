@@ -666,7 +666,12 @@ class QQAdapter(BasePlatformAdapter):
 
         chat_type = parsed.get("chat_type", "")
         chat_id = parsed.get("chat_id", "")
-        if chat_type == "c2c":
+        # QQ private chats appear as ``c2c`` in QQ's event schema, but the
+        # shared gateway session key builder may label the same DM as ``dm``.
+        # Treat both as the same private-chat shape so inline approval buttons
+        # generated for ``agent:main:qqbot:dm:<openid>`` can be accepted by the
+        # owning operator instead of being rejected as unauthorized.
+        if chat_type in {"c2c", "dm"}:
             return bool(chat_id) and operator == chat_id
         if chat_type in {"group", "guild"}:
             event_chat = str(event.group_openid or event.guild_id or "").strip()
