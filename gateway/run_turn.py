@@ -2216,12 +2216,14 @@ class GatewayTurnMixin:
             # streaming + kanban paths do.
             from gateway.platforms.base import should_send_media_as_audio as _should_send_media_as_audio
             from gateway.run_notifications import _IMAGE_EXTS, _VIDEO_EXTS
+            _reply_anchor = event_message_id
             for media_path, _is_voice in (media_files or []):
                 _ext = os.path.splitext(media_path)[1].lower()
                 with suppress(Exception):
                     if _should_send_media_as_audio(source.platform, _ext, _is_voice):
                         await adapter.send_voice(
-                            chat_id=source.chat_id, audio_path=media_path, metadata=_thread_metadata,
+                            chat_id=source.chat_id, audio_path=media_path, reply_to=_reply_anchor,
+                            metadata=_thread_metadata,
                             is_voice=_is_voice,
                         )
                     else:
@@ -2230,7 +2232,9 @@ class GatewayTurnMixin:
                             else (adapter.send_image_file, "image_path") if _ext in _IMAGE_EXTS
                             else (adapter.send_document, "file_path")
                         )
-                        await sender(chat_id=source.chat_id, metadata=_thread_metadata, **{key: media_path})
+                        await sender(
+                            chat_id=source.chat_id, reply_to=_reply_anchor,
+                            metadata=_thread_metadata, **{key: media_path})
 
         except Exception as e:
             logger.exception("Background task %s failed", task_id)

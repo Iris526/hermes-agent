@@ -271,6 +271,7 @@ class GatewayNotificationsMixin:
                 else self._thread_metadata_for_source(event.source, self._reply_anchor_for_event(event))
             )
             chat_id = event.source.chat_id
+            reply_anchor = self._reply_anchor_for_event(event)
             # Images go out as one batch (e.g. Signal's multi-attachment RPC) unless [[as_document]].
             def _is_photo(media_path: str, is_voice: bool) -> bool:
                 ext = Path(media_path).suffix.lower()
@@ -289,12 +290,15 @@ class GatewayNotificationsMixin:
                     ext = Path(media_path).suffix.lower()
                     if should_send_media_as_audio(event.source.platform, ext, is_voice=is_voice):
                         await adapter.send_voice(
-                            chat_id=chat_id, audio_path=media_path, metadata=_thread_meta, is_voice=is_voice,
+                            chat_id=chat_id, audio_path=media_path, reply_to=reply_anchor,
+                            metadata=_thread_meta, is_voice=is_voice,
                         )
                     elif ext in _VIDEO_EXTS:
-                        await adapter.send_video(chat_id=chat_id, video_path=media_path, metadata=_thread_meta)
+                        await adapter.send_video(
+                            chat_id=chat_id, video_path=media_path, reply_to=reply_anchor, metadata=_thread_meta)
                     else:
-                        await adapter.send_document(chat_id=chat_id, file_path=media_path, metadata=_thread_meta)
+                        await adapter.send_document(
+                            chat_id=chat_id, file_path=media_path, reply_to=reply_anchor, metadata=_thread_meta)
                 except Exception as e:
                     logger.warning("[%s] Post-stream media delivery failed: %s", adapter.name, e)
 

@@ -38,10 +38,10 @@ def _event():
     )
 
 
-def _fake_runner(thread_meta):
+def _fake_runner(thread_meta, reply_anchor=None):
     return SimpleNamespace(
         _thread_metadata_for_source=lambda source, anchor=None: thread_meta,
-        _reply_anchor_for_event=lambda event: None,
+        _reply_anchor_for_event=lambda event: reply_anchor,
     )
 
 
@@ -109,5 +109,22 @@ async def test_explicit_media_tag_still_delivers_post_stream(tmp_path, monkeypat
     images_kwargs = adapter.send_multiple_images.await_args.kwargs
     assert images_kwargs["chat_id"] == "C123CHAN"
     assert str(media_file) in images_kwargs["images"][0][0]
+
+
+@pytest.mark.asyncio
+async def test_post_stream_non_image_media_preserves_reply_anchor(tmp_path, monkeypatch):
+    """Explicit post-stream media keeps the inbound reply relationship."""
+    media_file = _allowed_media_path(tmp_path, monkeypatch, "answer.mp3")
+    adapter = _adapter()
+
+    await GatewayRunner._deliver_media_from_response(
+        _fake_runner({}, reply_anchor="171.000001"),
+        f"MEDIA:{media_file}",
+        _event(),
+        adapter,
+    )
+
+    adapter.send_voice.assert_awaited_once()
+    assert adapter.send_voice.await_args.kwargs["reply_to"] == "171.000001"
 
 

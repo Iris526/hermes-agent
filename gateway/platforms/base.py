@@ -3784,19 +3784,24 @@ class BasePlatformAdapter(ABC):
             await self._send_image_batch(
                 event, [(f"file://{_quote(p)}", "") for p in _image_paths], metadata, human_delay)
         chat_id = event.source.chat_id
+        reply_anchor = _reply_anchor_for_event(event)
 
         async def _send_one(path: str, *, is_voice: bool, media_tag: bool) -> None:
             """MEDIA-tag files (``media_tag``) may route to send_voice; bare local files never
             do."""
             ext = Path(path).suffix.lower()
             if media_tag and should_send_media_as_audio(self.platform, ext, is_voice=is_voice):
-                result = await self.send_voice(chat_id=chat_id, audio_path=path, metadata=metadata, is_voice=is_voice)
+                result = await self.send_voice(
+                    chat_id=chat_id, audio_path=path, reply_to=reply_anchor,
+                    metadata=metadata, is_voice=is_voice)
             elif ext in _VIDEO_EXTS:
                 if media_tag:
                     logger.info("[%s] Sending video attachment (%s) to %s", self.name, ext, chat_id)
-                result = await self.send_video(chat_id=chat_id, video_path=path, metadata=metadata)
+                result = await self.send_video(
+                    chat_id=chat_id, video_path=path, reply_to=reply_anchor, metadata=metadata)
             else:
-                result = await self.send_document(chat_id=chat_id, file_path=path, metadata=metadata)
+                result = await self.send_document(
+                    chat_id=chat_id, file_path=path, reply_to=reply_anchor, metadata=metadata)
             if not result.success:
                 logger.warning("[%s] Failed to send %s (%s): %s", self.name,
                                "media" if media_tag else "local file", ext, result.error)
