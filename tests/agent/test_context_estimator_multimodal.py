@@ -31,3 +31,20 @@ def test_text_payloads_and_tool_schemas_keep_the_legacy_estimate():
                "tools": [{"type": "function", "function": {"name": "vision", "parameters": {"type": "image"}}}]}
     legacy = (sum(len(str(m)) for m in payload["messages"]) + len(str(payload["tools"]))) // 4
     assert abs(estimate_request_context_tokens(payload) - legacy) < legacy * 0.02
+
+
+def test_tool_schema_property_named_type_does_not_break_request_estimate():
+    """Tool schemas may contain a property named `type` whose value is another schema."""
+    payload = {
+        "input": [{"role": "user", "content": "hello"}],
+        "instructions": "test",
+        "tools": [{
+            "type": "function",
+            "name": "life_collection",
+            "parameters": {
+                "type": "object",
+                "properties": {"type": {"type": "string", "description": "Alias"}},
+            },
+        }],
+    }
+    assert estimate_request_context_tokens(payload) > 0
